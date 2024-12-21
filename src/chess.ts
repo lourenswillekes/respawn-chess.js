@@ -55,6 +55,7 @@ export const DEFAULT_POSITION =
 export type Piece = {
   color: Color
   type: PieceSymbol
+  spawn: number
 }
 
 type InternalMove = {
@@ -813,7 +814,8 @@ export class Chess {
       this._kings[currentPieceOnSquare.color] = EMPTY
     }
 
-    this._board[sq] = { type: type as PieceSymbol, color: color as Color }
+    this._board[sq] = { type: type as PieceSymbol, color: color as Color, spawn: sq}
+    console.log(this._board[sq])
 
     if (type === KING) {
       this._kings[color] = sq
@@ -1454,7 +1456,8 @@ export class Chess {
 
     // if pawn promotion, replace with new piece
     if (move.promotion) {
-      this._board[move.to] = { type: move.promotion, color: us }
+      this._board[move.to] = { type: move.promotion, color: us, spawn: move.to }
+      console.log(this._board[move.to])
     }
 
     // if we moved the king
@@ -1572,10 +1575,12 @@ export class Chess {
         } else {
           index = move.to + 16
         }
-        this._board[index] = { type: PAWN, color: them }
+        this._board[index] = { type: PAWN, color: them, spawn: -1 }
+        console.log(this._board[index])
       } else {
         // regular capture
-        this._board[move.to] = { type: move.captured, color: them }
+        this._board[move.to] = { type: move.captured, color: them, spawn: -1 }
+        console.log(this._board[move.to])
       }
     }
 
