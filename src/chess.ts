@@ -1461,9 +1461,22 @@ export class Chess {
 
     console.log(this._board[move.from])
     console.log(this._board[move.to])
+    if (this._board[move.to]) {
+      console.log(this._board[move.to].spawn)
+    }
 
     this._board[move.to] = this._board[move.from]
     delete this._board[move.from]
+
+    // if capture
+    if (move.captured) {
+      // if spawn is clear
+      if (!this._board[move.captured.spawn]) {
+        // respawn captured piece
+        this._board[move.captured.spawn] = move.captured
+      }
+    }
+
 
     // if ep capture, remove the captured pawn
     if (move.flags & BITS.EP_CAPTURE) {
@@ -1583,12 +1596,20 @@ export class Chess {
 
     this._board[move.from] = this._board[move.to]
     this._board[move.from].type = move.piece.type // to undo any promotions
-    const sp = this._board[move.to].spawn
     delete this._board[move.to]
 
-    // TODO
     if (move.captured) {
       this._board[move.to] = move.captured
+
+      // remove respawned piece if it wasn't captured on spawn
+      if (move.captured === this._board[move.captured.spawn]) {
+        delete this._board[move.captured.spawn]
+      }
+
+      if (move.to === move.captured.spawn) {
+        this._board[move.to] = move.captured
+      }
+
     }
 
     if (move.flags & (BITS.KSIDE_CASTLE | BITS.QSIDE_CASTLE)) {
