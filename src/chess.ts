@@ -62,8 +62,8 @@ type InternalMove = {
   color: Color
   from: number
   to: number
-  piece: PieceSymbol
-  captured?: PieceSymbol
+  piece: Piece
+  captured?: Piece
   promotion?: PieceSymbol
   flags: number
 }
@@ -82,8 +82,8 @@ export type Move = {
   color: Color
   from: Square
   to: Square
-  piece: PieceSymbol
-  captured?: PieceSymbol
+  piece: Piece
+  captured?: Piece
   promotion?: PieceSymbol
   flags: string
   san: string
@@ -421,7 +421,7 @@ export function validateFen(fen: string) {
 function getDisambiguator(move: InternalMove, moves: InternalMove[]) {
   const from = move.from
   const to = move.to
-  const piece = move.piece
+  const piece = move.piece.type
 
   let ambiguities = 0
   let sameRank = 0
@@ -430,7 +430,7 @@ function getDisambiguator(move: InternalMove, moves: InternalMove[]) {
   for (let i = 0, len = moves.length; i < len; i++) {
     const ambigFrom = moves[i].from
     const ambigTo = moves[i].to
-    const ambigPiece = moves[i].piece
+    const ambigPiece = moves[i].piece.type
 
     /*
      * if a move of the same piece type ends on the same to square, we'll need
@@ -476,13 +476,13 @@ function addMove(
   color: Color,
   from: number,
   to: number,
-  piece: PieceSymbol,
-  captured: PieceSymbol | undefined = undefined,
+  piece: Piece,
+  captured: Piece | undefined = undefined,
   flags: number = BITS.NORMAL,
 ) {
   const r = rank(to)
 
-  if (piece === PAWN && (r === RANK_1 || r === RANK_8)) {
+  if (piece.type === PAWN && (r === RANK_1 || r === RANK_8)) {
     for (let i = 0; i < PROMOTIONS.length; i++) {
       const promotion = PROMOTIONS[i]
       moves.push({
@@ -721,8 +721,8 @@ export class Chess {
             color,
             from: square,
             to: this._epSquare,
-            piece: PAWN,
-            captured: PAWN,
+            piece: this._board[square],
+            captured: this._board[this._epSquare],
             flags: BITS.EP_CAPTURE,
           })
           const isLegal = !this._isKingAttacked(color)
@@ -814,8 +814,11 @@ export class Chess {
       this._kings[currentPieceOnSquare.color] = EMPTY
     }
 
-    this._board[sq] = { type: type as PieceSymbol, color: color as Color, spawn: sq}
-    console.log(this._board[sq])
+    this._board[sq] = {
+      type: type as PieceSymbol,
+      color: color as Color,
+      spawn: sq,
+    }
 
     if (type === KING) {
       this._kings[color] = sq
@@ -1103,9 +1106,10 @@ export class Chess {
 
   moves(): string[]
   moves({ square }: { square: Square }): string[]
-  moves({ piece }: { piece: PieceSymbol }): string[]
+  moves({ piece }: { piece: Piece }): string[]
 
-  moves({ square, piece }: { square: Square; piece: PieceSymbol }): string[]
+  moves({ square, piece }: { square: Square; piece: Piece }): string[]
+  moves({ square, piece }: { square?: Square; piece?: Piece }): Move[]
 
   moves({ verbose, square }: { verbose: true; square?: Square }): Move[]
   moves({ verbose, square }: { verbose: false; square?: Square }): string[]
@@ -1117,14 +1121,14 @@ export class Chess {
     square?: Square
   }): string[] | Move[]
 
-  moves({ verbose, piece }: { verbose: true; piece?: PieceSymbol }): Move[]
-  moves({ verbose, piece }: { verbose: false; piece?: PieceSymbol }): string[]
+  moves({ verbose, piece }: { verbose: true; piece?: Piece }): Move[]
+  moves({ verbose, piece }: { verbose: false; piece?: Piece }): string[]
   moves({
     verbose,
     piece,
   }: {
     verbose?: boolean
-    piece?: PieceSymbol
+    piece?: Piece
   }): string[] | Move[]
 
   moves({
@@ -1134,7 +1138,7 @@ export class Chess {
   }: {
     verbose: true
     square?: Square
-    piece?: PieceSymbol
+    piece?: Piece
   }): Move[]
   moves({
     verbose,
@@ -1143,7 +1147,7 @@ export class Chess {
   }: {
     verbose: false
     square?: Square
-    piece?: PieceSymbol
+    piece?: Piece
   }): string[]
   moves({
     verbose,
@@ -1152,16 +1156,14 @@ export class Chess {
   }: {
     verbose?: boolean
     square?: Square
-    piece?: PieceSymbol
+    piece?: Piece
   }): string[] | Move[]
-
-  moves({ square, piece }: { square?: Square; piece?: PieceSymbol }): Move[]
 
   moves({
     verbose = false,
     square = undefined,
     piece = undefined,
-  }: { verbose?: boolean; square?: Square; piece?: PieceSymbol } = {}) {
+  }: { verbose?: boolean; square?: Square; piece?: Piece } = {}) {
     const moves = this._moves({ square, piece })
 
     if (verbose) {
@@ -1177,11 +1179,11 @@ export class Chess {
     square = undefined,
   }: {
     legal?: boolean
-    piece?: PieceSymbol
+    piece?: Piece
     square?: Square
   } = {}) {
     const forSquare = square ? (square.toLowerCase() as Square) : undefined
-    const forPiece = piece?.toLowerCase()
+    const forPiece = piece?.type.toLowerCase()
 
     const moves: InternalMove[] = []
     const us = this._turn
@@ -1222,12 +1224,20 @@ export class Chess {
         // single square, non-capturing
         to = from + PAWN_OFFSETS[us][0]
         if (!this._board[to]) {
-          addMove(moves, us, from, to, PAWN)
+          addMove(moves, us, from, to, this._board[from])
 
           // double square
           to = from + PAWN_OFFSETS[us][1]
           if (SECOND_RANK[us] === rank(from) && !this._board[to]) {
-            addMove(moves, us, from, to, PAWN, undefined, BITS.BIG_PAWN)
+            addMove(
+              moves,
+              us,
+              from,
+              to,
+              this._board[from],
+              undefined,
+              BITS.BIG_PAWN,
+            )
           }
         }
 
@@ -1242,12 +1252,20 @@ export class Chess {
               us,
               from,
               to,
-              PAWN,
-              this._board[to].type,
+              this._board[from],
+              this._board[to],
               BITS.CAPTURE,
             )
           } else if (to === this._epSquare) {
-            addMove(moves, us, from, to, PAWN, PAWN, BITS.EP_CAPTURE)
+            addMove(
+              moves,
+              us,
+              from,
+              to,
+              this._board[from],
+              this._board[to],
+              BITS.EP_CAPTURE,
+            )
           }
         }
       } else {
@@ -1262,7 +1280,7 @@ export class Chess {
             if (to & 0x88) break
 
             if (!this._board[to]) {
-              addMove(moves, us, from, to, type)
+              addMove(moves, us, from, to, this._board[from])
             } else {
               // own color, stop loop
               if (this._board[to].color === us) break
@@ -1272,8 +1290,8 @@ export class Chess {
                 us,
                 from,
                 to,
-                type,
-                this._board[to].type,
+                this._board[from],
+                this._board[to],
                 BITS.CAPTURE,
               )
               break
@@ -1311,7 +1329,7 @@ export class Chess {
               us,
               this._kings[us],
               castlingTo,
-              KING,
+              this._board[castlingFrom],
               undefined,
               BITS.KSIDE_CASTLE,
             )
@@ -1336,7 +1354,7 @@ export class Chess {
               us,
               this._kings[us],
               castlingTo,
-              KING,
+              this._board[castlingFrom],
               undefined,
               BITS.QSIDE_CASTLE,
             )
@@ -1419,7 +1437,6 @@ export class Chess {
      * is made
      */
     const prettyMove = this._makePretty(moveObj)
-
     this._makeMove(moveObj)
     this._incPositionCount(prettyMove.after)
     return prettyMove
@@ -1442,6 +1459,9 @@ export class Chess {
     const them = swapColor(us)
     this._push(move)
 
+    console.log(this._board[move.from])
+    console.log(this._board[move.to])
+
     this._board[move.to] = this._board[move.from]
     delete this._board[move.from]
 
@@ -1457,7 +1477,6 @@ export class Chess {
     // if pawn promotion, replace with new piece
     if (move.promotion) {
       this._board[move.to] = { type: move.promotion, color: us, spawn: move.to }
-      console.log(this._board[move.to])
     }
 
     // if we moved the king
@@ -1519,7 +1538,7 @@ export class Chess {
     }
 
     // reset the 50 move counter if a pawn is moved or a piece is captured
-    if (move.piece === PAWN) {
+    if (move.piece.type === PAWN) {
       this._halfMoves = 0
     } else if (move.flags & (BITS.CAPTURE | BITS.EP_CAPTURE)) {
       this._halfMoves = 0
@@ -1563,25 +1582,13 @@ export class Chess {
     const them = swapColor(us)
 
     this._board[move.from] = this._board[move.to]
-    this._board[move.from].type = move.piece // to undo any promotions
+    this._board[move.from].type = move.piece.type // to undo any promotions
+    const sp = this._board[move.to].spawn
     delete this._board[move.to]
 
+    // TODO
     if (move.captured) {
-      if (move.flags & BITS.EP_CAPTURE) {
-        // en passant capture
-        let index: number
-        if (us === BLACK) {
-          index = move.to - 16
-        } else {
-          index = move.to + 16
-        }
-        this._board[index] = { type: PAWN, color: them, spawn: -1 }
-        console.log(this._board[index])
-      } else {
-        // regular capture
-        this._board[move.to] = { type: move.captured, color: them, spawn: -1 }
-        console.log(this._board[move.to])
-      }
+      this._board[move.to] = move.captured
     }
 
     if (move.flags & (BITS.KSIDE_CASTLE | BITS.QSIDE_CASTLE)) {
@@ -2002,13 +2009,13 @@ export class Chess {
     } else if (move.flags & BITS.QSIDE_CASTLE) {
       output = 'O-O-O'
     } else {
-      if (move.piece !== PAWN) {
+      if (move.piece.type !== PAWN) {
         const disambiguator = getDisambiguator(move, moves)
-        output += move.piece.toUpperCase() + disambiguator
+        output += move.piece.type.toUpperCase() + disambiguator
       }
 
       if (move.flags & (BITS.CAPTURE | BITS.EP_CAPTURE)) {
-        if (move.piece === PAWN) {
+        if (move.piece.type === PAWN) {
           output += algebraic(move.from)[0]
         }
         output += 'x'
@@ -2040,7 +2047,10 @@ export class Chess {
     const cleanMove = strippedSan(move)
 
     let pieceType = inferPieceType(cleanMove)
-    let moves = this._moves({ legal: true, piece: pieceType })
+    let moves = this._moves({
+      legal: true,
+      piece: { color: 'w', type: pieceType as PieceSymbol, spawn: -1 },
+    })
 
     // strict parser
     for (let i = 0, len = moves.length; i < len; i++) {
@@ -2120,7 +2130,7 @@ export class Chess {
     pieceType = inferPieceType(cleanMove)
     moves = this._moves({
       legal: true,
-      piece: piece ? (piece as PieceSymbol) : pieceType,
+      piece: { color: 'w', type: pieceType as PieceSymbol, spawn: -1 },
     })
 
     if (!to) {
@@ -2138,7 +2148,7 @@ export class Chess {
         }
         // hand-compare move properties with the results from our permissive regex
       } else if (
-        (!piece || piece.toLowerCase() == moves[i].piece) &&
+        (!piece || piece.toLowerCase() == moves[i].piece.type) &&
         Ox88[from] == moves[i].from &&
         Ox88[to] == moves[i].to &&
         (!promotion || promotion.toLowerCase() == moves[i].promotion)
@@ -2152,7 +2162,7 @@ export class Chess {
 
         const square = algebraic(moves[i].from)
         if (
-          (!piece || piece.toLowerCase() == moves[i].piece) &&
+          (!piece || piece.toLowerCase() == moves[i].piece.type) &&
           Ox88[to] == moves[i].to &&
           (from == square[0] || from == square[1]) &&
           (!promotion || promotion.toLowerCase() == moves[i].promotion)
