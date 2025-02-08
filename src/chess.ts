@@ -1,4 +1,10 @@
 /**
+ * respawn-chess.ts
+ *
+ * Adapted from Jeff Hlywa's chess.ts; redistribution conditions below
+ */
+
+/**
  * @license
  * Copyright (c) 2023, Jeff Hlywa (jhlywa@gmail.com)
  * All rights reserved.
@@ -717,6 +723,25 @@ export class Chess {
           this._board[square]?.type === PAWN
         ) {
           // if the pawn makes an ep capture, does it leave it's king in check?
+          console.log('fen() _makeMove()')
+          console.log('color:')
+          console.log(color)
+          console.log('from:')
+          console.log(square)
+          console.log('to:')
+          console.log(this._epSquare)
+          console.log('piece:')
+          console.log(this._board[square])
+
+          var capturedSquare = this._epSquare
+          if (this._turn === WHITE) {
+            capturedSquare += 16
+          } else {
+            capturedSquare -= 16
+          }
+
+          console.log('captured')
+          console.log(this._board[capturedSquare])
           this._makeMove({
             color,
             from: square,
@@ -1257,13 +1282,33 @@ export class Chess {
               BITS.CAPTURE,
             )
           } else if (to === this._epSquare) {
+            console.log('_moves()')
+            console.log('color:')
+            console.log(us)
+            console.log('from:')
+            console.log(from)
+            console.log('to:')
+            console.log(to)
+            console.log('piece:')
+            console.log(this._board[from])
+
+            var capturedSquare = this._epSquare
+            if (this._turn === WHITE) {
+              capturedSquare += 16
+            } else {
+              capturedSquare -= 16
+            }
+
+            console.log('captured')
+            console.log(this._board[capturedSquare])
+
             addMove(
               moves,
               us,
               from,
               to,
               this._board[from],
-              this._board[to],
+              this._board[capturedSquare],
               BITS.EP_CAPTURE,
             )
           }
@@ -1459,12 +1504,6 @@ export class Chess {
     const them = swapColor(us)
     this._push(move)
 
-    console.log(this._board[move.from])
-    console.log(this._board[move.to])
-    if (this._board[move.to]) {
-      console.log(this._board[move.to].spawn)
-    }
-
     this._board[move.to] = this._board[move.from]
     delete this._board[move.from]
 
@@ -1476,7 +1515,6 @@ export class Chess {
         this._board[move.captured.spawn] = move.captured
       }
     }
-
 
     // if ep capture, remove the captured pawn
     if (move.flags & BITS.EP_CAPTURE) {
@@ -1599,6 +1637,10 @@ export class Chess {
     delete this._board[move.to]
 
     if (move.captured) {
+      if (move.flags & BITS.EP_CAPTURE) {
+        console.log('undoing en peasant')
+      }
+
       this._board[move.to] = move.captured
 
       // remove respawned piece if it wasn't captured on spawn
@@ -1609,7 +1651,6 @@ export class Chess {
       if (move.to === move.captured.spawn) {
         this._board[move.to] = move.captured
       }
-
     }
 
     if (move.flags & (BITS.KSIDE_CASTLE | BITS.QSIDE_CASTLE)) {
