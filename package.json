@@ -1,11 +1,11 @@
 {
   "name": "respawn-chess.js",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "BSD-2-Clause",
   "main": "dist/cjs/chess.js",
   "module": "dist/esm/chess.js",
   "types": "dist/types/chess.d.ts",
-  "homepage": "https://github.com/lourenswillekes/respawn-chess.js",
+  "homepage": "https://lourenswillekes.github.io/respawn-chess/",
   "author": "Lourens Willekes",
   "scripts": {
     "prepare": "npm run build",
